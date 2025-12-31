@@ -1,5 +1,5 @@
 use clearscreen;
-use password_manager::{Entry, add, delete, get, input, list, load_from_file};
+use password_manager::*;
 use std::{collections::HashMap, io::Write};
 
 fn main() {
@@ -9,21 +9,23 @@ fn main() {
     let mut vault: HashMap<String, Entry> = load_from_file("passwords.bin", &master_pwd);
 
     loop {
-        print!(
-            "This is the CLI password manager. Please type a command to continue \n(for a list of available commands type \"help\": "
+        let command = input(
+            "This is the CLI password manager. Please type a command to continue \n(for a list of available commands type \"help\": ",
         );
-        let _ = std::io::stdout().flush();
-        let command = input();
         match command.as_str() {
-            "a" | "A" | "add" | "ADD" | "Add" | "1" => add(&mut vault, &master_pwd),
+            "add" | "ADD" | "Add" | "1" => add(&mut vault, &master_pwd),
 
-            "g" | "G" | "get" | "GET" | "Get" | "2" => get(&vault),
+            "get" | "GET" | "Get" | "2" => get(&vault),
 
-            "d" | "D" | "delete" | "DELETE" | "Delete" | "3" => delete(&mut vault, &master_pwd),
+            "delete" | "DELETE" | "Delete" | "3" => delete(&mut vault, &master_pwd),
 
-            "l" | "L" | "list" | "LIST" | "List" | "4" => list(&vault),
+            "list" | "LIST" | "List" | "4" => list(&vault),
 
-            "q" | "Q" | "quit" | "QUIT" | "Quit" | "5" => {
+            "gen" | "GEN" | "Gen" | "5" => _ = generate(),
+
+            "edit" | "EDIT" | "Edit" | "6" => edit(&mut vault, &master_pwd),
+
+            "q" | "Q" | "quit" | "QUIT" | "Quit" | "7" => {
                 println!("Now exiting the password manager.");
                 break;
             }
@@ -34,15 +36,17 @@ fn main() {
             2. get: Retrieve an entry from the password vault.
             3. delete: Delete an entry from the password vault.
             4. list: Lists all entries in the vault.
-            5. quit: exit the program."
+            5. gen: Generate a random password of a given length.
+            6. edit: Change the attributes of an entry.
+            7. quit: Exit the program."
                 );
             }
             _ => {
                 println!("Unknown command.");
             }
         }
-        println!("Press enter to go back to menu.");
-        input();
+
+        input("Press enter to go back to menu.");
         clearscreen::clear().expect("failed to clear screen");
     }
 }

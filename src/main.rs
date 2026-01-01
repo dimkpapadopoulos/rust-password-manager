@@ -1,5 +1,14 @@
+//Modules
+mod commands;
+mod models;
+mod storage;
+mod utils;
+//Bring crates into scope
+use crate::commands::{add, delete, edit, generate, get, list, search};
+use crate::models::Entry;
+use crate::storage::load_from_file;
+use crate::utils::input;
 use clearscreen;
-use password_manager::*;
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
 

@@ -1,12 +1,14 @@
 use crate::models::Entry;
 use crate::storage::save_to_file;
 use crate::utils::{generate_password, input};
-
 use arboard::Clipboard;
 use rpassword::prompt_password;
 use secrecy::{ExposeSecret, Secret};
 use std::collections::HashMap;
+use std::fs::File;
 use std::{thread, time};
+
+const DB_FILE: &str = "passwords.bin";
 
 pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
     let name = input("Name: ");
@@ -156,4 +158,56 @@ pub fn search(vault: &HashMap<String, Entry>) {
         }
     }
     println!("---------------");
+}
+pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>) {
+    let path = input("Path of csv file: ");
+    let file = match File::open(&path) {
+        Ok(f) => f,
+        Err(e) => {
+            println!("Failed to open file '{}': {}", path, e);
+            return;
+        }
+    };
+    let mut rdr = csv::Reader::from_reader(file);
+    let mut count = 0;
+    let mut skipped = 0;
+    for result in rdr.records() {
+        match result {
+            Ok(record) => {
+                if record.len() >= 4 {
+                    let name = record[0].to_string();
+                    let url = record[1].to_string();
+                    let username = record[2].to_string();
+                    let password = record[3].to_string();
+
+                    // Create the Entry struct
+                    let new_entry = Entry {
+                        name: name.clone(),
+                        url: url,
+                        username,
+                        password: Secret::new(password),
+                    };
+
+                    // Insert into Vault
+                    vault.insert(name, new_entry);
+                    count += 1;
+                } else {
+                    println!("Skipping row (not enough columns): {:?}", record);
+                    skipped += 1;
+                }
+            }
+            Err(_) => skipped += 1, // Skip corrupt rows
+        }
+    }
+
+    // 4. Save the updated vault to disk immediately
+    save_to_file(vault, DB_FILE, master_pwd.expose_secret());
+
+    println!("--------------------------------------------------");
+    println!("✅ Import Complete!");
+    println!("   Added: {} entries", count);
+    if skipped > 0 {
+        println!("   Skipped: {} invalid rows", skipped);
+    }
+    println!("--------------------------------------------------");
 }

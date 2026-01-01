@@ -4,7 +4,7 @@ mod models;
 mod storage;
 mod utils;
 //Bring crates into scope
-use crate::commands::{add, delete, edit, generate, get, list, search};
+use crate::commands::*;
 use crate::models::Entry;
 use crate::storage::load_from_file;
 use crate::utils::input;
@@ -21,7 +21,9 @@ fn main() {
 4. list: Lists all entries in the vault.
 5. gen: Generate a random password of a given length.
 6. edit: Change the attributes of an entry.
-7. quit: Exit the program.";
+7. import: Import information from a csv file.
+quit: Exit the program.
+help: This menu.";
     let master_pwd = secrecy::Secret::new(
         rpassword::prompt_password("Enter your master password: ")
             .expect("Failed to get master password."),
@@ -36,20 +38,14 @@ fn main() {
         );
         match command.to_lowercase().as_str() {
             "add" | "1" => add(&mut vault, &master_pwd.expose_secret()),
-
             "get" | "2" => get(&vault),
-
             "delete" | "3" => delete(&mut vault, &master_pwd.expose_secret()),
-
             "list" | "4" => list(&vault),
-
             "gen" | "5" => _ = generate(),
-
             "edit" | "6" => edit(&mut vault, &master_pwd.expose_secret()),
-
             "search" | "7" => search(&vault),
-
-            "q" | "quit" | "8" => {
+            "import" | "8" => import(&mut vault, &master_pwd),
+            "q" | "quit" => {
                 println!("Now exiting the password manager.");
                 break;
             }

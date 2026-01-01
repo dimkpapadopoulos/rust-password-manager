@@ -41,6 +41,7 @@ pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
         }
     }
 }
+
 pub fn get(vault: &HashMap<String, Entry>) {
     let name = input("Name: ");
     println!(
@@ -79,14 +80,16 @@ pub fn get(vault: &HashMap<String, Entry>) {
         }
     }
 }
+
 pub fn list(vault: &HashMap<String, Entry>) {
     println!("Stored passwords: {}", vault.len());
     let mut i = 0;
     for (name, _entry) in vault {
         i += 1;
-        println!("{}. {}\n", i, name);
+        println!("{}. {}", i, name);
     }
 }
+
 pub fn generate() -> String {
     let len_str = input("Length (default 16):");
     let len = len_str.parse::<usize>().unwrap_or(16); // Default to 16 if input is invalid
@@ -159,6 +162,7 @@ pub fn search(vault: &HashMap<String, Entry>) {
     }
     println!("---------------");
 }
+
 pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>) {
     let path = input("Path of csv file: ");
     let file = match File::open(&path) {
@@ -204,10 +208,10 @@ pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>) {
     save_to_file(vault, DB_FILE, master_pwd.expose_secret());
 
     println!("--------------------------------------------------");
-    println!("✅ Import Complete!");
-    println!("   Added: {} entries", count);
+    println!("Import Complete!");
+    println!("Added: {} entries", count);
     if skipped > 0 {
-        println!("   Skipped: {} invalid rows", skipped);
+        println!("Skipped: {} invalid rows", skipped);
     }
     println!("--------------------------------------------------");
 }

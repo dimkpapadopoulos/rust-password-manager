@@ -1,6 +1,6 @@
 use clearscreen;
 use password_manager::*;
-use std::{collections::HashMap, io::Write};
+use std::collections::HashMap;
 
 fn main() {
     let master_pwd = rpassword::prompt_password("Enter your master password: ")
@@ -10,7 +10,7 @@ fn main() {
 
     loop {
         let command = input(
-            "This is the CLI password manager. Please type a command to continue \n(for a list of available commands type \"help\": ",
+            "This is the CLI password manager. Please type a command to continue \n(for a list of available commands type \"help\" or \"h\"): ",
         );
         match command.as_str() {
             "add" | "ADD" | "Add" | "1" => add(&mut vault, &master_pwd),
@@ -31,7 +31,7 @@ fn main() {
             }
             "h" | "H" | "help" | "HELP" | "Help" => {
                 println!(
-                    "List of available commands:
+                    "List of available commands (you can use either numbers or keywords, not case-sensitive):
             1. add: Create a new entry in the password vault.
             2. get: Retrieve an entry from the password vault.
             3. delete: Delete an entry from the password vault.

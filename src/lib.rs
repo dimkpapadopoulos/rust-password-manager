@@ -179,7 +179,13 @@ pub fn edit(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
 
         let new_user = input("Enter new Username (press Enter to keep current): ");
 
-        let new_pass = input("Enter new Password (press Enter to keep current):");
+        let password_input =
+            rpassword::prompt_password("Enter new Password (press Enter to keep current): ");
+        if password_input.is_err() {
+            return;
+        }
+
+        let new_pass = password_input.unwrap();
 
         if !new_user.is_empty() {
             entry.username = new_user;

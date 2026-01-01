@@ -8,17 +8,26 @@ use chacha20poly1305::{
 };
 use rand::{RngCore, rngs::OsRng};
 use rpassword;
-use serde::{Deserialize, Serialize};
+use secrecy::{ExposeSecret, Secret};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write, stdin, stdout};
+use std::{thread, time};
 
+fn serialize_secret<S>(secret: &Secret<String>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    secret.expose_secret().serialize(serializer)
+}
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Entry {
     pub name: String,
     pub url: String,
     pub username: String,
-    pub password: String,
+    #[serde(serialize_with = "serialize_secret")]
+    pub password: Secret<String>,
 }
 
 pub fn input(str_to_print: &str) -> String {
@@ -97,7 +106,7 @@ pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
         name,
         url,
         username,
-        password,
+        password: Secret::new(password),
     };
     let old_value = vault.insert(new_entry.name.clone(), new_entry);
     save_to_file(vault, "passwords.bin", master_pwd);
@@ -118,22 +127,26 @@ pub fn get(vault: &HashMap<String, Entry>) {
     let retrieved_entry = vault.get(&name);
     match retrieved_entry {
         Some(entry) => {
+            let pass_to_copy = entry.password.expose_secret().clone();
             println!(
                 "Name: {}\nUrl: {}\nUsername: {}\nPassword: {}",
                 entry.name,
                 entry.url,
                 entry.username,
-                String::from_iter(std::iter::repeat_n("*", entry.password.len()))
+                String::from_iter(std::iter::repeat_n("*", pass_to_copy.len()))
             );
             match Clipboard::new() {
-                Ok(mut clipboard) => {
-                    if let Err(e) = clipboard.set_text(&entry.password) {
-                        eprintln!("Failed to copy to clipboard: {}", e);
+                Ok(mut clip) => {
+                    if clip.set_text(pass_to_copy).is_ok() {
+                        println!("Password copied to clipboard! (Clearing in a minute...)");
+                        thread::spawn(move || {
+                            thread::sleep(time::Duration::from_secs(60));
+                            if let Ok(mut c) = Clipboard::new() {
+                                let _ = c.set_text("");
+                            }
+                        });
                     } else {
-                        println!("Password copied to clipboard!");
-
-                        // Optional: Clear clipboard after delay (requires spawning a thread)
-                        // For now, let's just confirm it's copied.
+                        eprintln!("Failed to copy to clipboard.");
                     }
                 }
                 Err(e) => eprintln!("Clipboard unavailable: {}", e),
@@ -192,7 +205,7 @@ pub fn edit(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
         }
 
         if !new_pass.is_empty() {
-            entry.password = new_pass;
+            entry.password = Secret::new(new_pass);
         }
 
         save_to_file(&vault, "passwords.bin", &master_pwd);
@@ -212,6 +225,17 @@ pub fn delete(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
         }
         None => println!("Entry not found in vault."),
     }
+}
+
+pub fn search(vault: &HashMap<String, Entry>) {
+    let query = input("Search query: ");
+    println!("--- Matches ---");
+    for key in vault.keys() {
+        if key.to_lowercase().contains(&query.to_lowercase()) {
+            println!(" - {}", key);
+        }
+    }
+    println!("---------------");
 }
 
 fn derive_key(password: &str, salt: &[u8]) -> [u8; 32] {

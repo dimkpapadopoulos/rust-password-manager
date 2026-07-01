@@ -2,11 +2,17 @@ use crate::models::Entry;
 use crate::storage::save_to_file;
 use crate::utils::{generate_password, input};
 use arboard::Clipboard;
+use crossterm::{
+    cursor::{MoveToColumn, MoveUp},
+    event::{Event, KeyCode, KeyEventKind, read},
+    execute,
+    terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
+};
 use rpassword::prompt_password;
 use secrecy::{ExposeSecret, Secret};
 use std::collections::HashMap;
 use std::fs::File;
-use std::{thread, time};
+use std::io::{Write, stdout};
 
 const DB_FILE: &str = "passwords.bin";
 
@@ -44,39 +50,88 @@ pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
 
 pub fn get(vault: &HashMap<String, Entry>) {
     let name = input("Name: ");
-    println!(
-        "Getting entry from vault. Press \"s\" to show password or \"c\" to copy it to clipboard."
-    );
-    let retrieved_entry = vault.get(&name);
-    match retrieved_entry {
+
+    match vault.get(&name) {
         Some(entry) => {
-            let pass_to_copy = entry.password.expose_secret().clone();
-            println!(
-                "Name: {}\nUrl: {}\nUsername: {}\nPassword: {}",
-                entry.name,
-                entry.url,
-                entry.username,
-                String::from_iter(std::iter::repeat_n("*", pass_to_copy.len()))
+            let pass_secret = entry.password.expose_secret();
+            let hidden_pass = "*".repeat(pass_secret.len());
+            let mut is_visible = false;
+
+            let mut stdout = stdout();
+            let _ = enable_raw_mode();
+
+            // Print initial state using \r\n for raw mode
+            print!(
+                "Name: {}\r\nUrl: {}\r\nUsername: {}\r\nPassword: {}\r\nPress \"s\" to toggle, \"c\" to copy, or Enter to exit.",
+                entry.name, entry.url, entry.username, hidden_pass
             );
-            match Clipboard::new() {
-                Ok(mut clip) => {
-                    if clip.set_text(pass_to_copy).is_ok() {
-                        println!("Password copied to clipboard! (Clearing in a minute...)");
-                        thread::spawn(move || {
-                            thread::sleep(time::Duration::from_secs(60));
-                            if let Ok(mut c) = Clipboard::new() {
-                                let _ = c.set_text("");
+            let _ = stdout.flush();
+
+            loop {
+                if let Ok(Event::Key(event)) = read() {
+                    // Ignore release events to prevent double-toggling
+                    if event.kind != KeyEventKind::Press {
+                        continue;
+                    }
+
+                    match event.code {
+                        KeyCode::Char('s') | KeyCode::Char('S') => {
+                            is_visible = !is_visible;
+                            let display_pass = if is_visible {
+                                pass_secret
+                            } else {
+                                &hidden_pass
+                            };
+
+                            // Move cursor to start of output, clear downwards, and redraw
+                            let _ = execute!(
+                                stdout,
+                                MoveToColumn(0),
+                                MoveUp(4),
+                                Clear(ClearType::FromCursorDown)
+                            );
+
+                            print!(
+                                "Name: {}\r\nUrl: {}\r\nUsername: {}\r\nPassword: {}\r\nPress \"s\" to toggle, \"c\" to copy, or Enter to exit.",
+                                entry.name, entry.url, entry.username, display_pass
+                            );
+                            let _ = stdout.flush();
+                        }
+                        KeyCode::Char('c') | KeyCode::Char('C') => {
+                            let _ = disable_raw_mode();
+                            let pass_to_copy = pass_secret.clone();
+
+                            match Clipboard::new() {
+                                Ok(mut clip) => {
+                                    if clip.set_text(pass_to_copy).is_ok() {
+                                        println!("\r\nPassword copied! (Clearing in 60s...)");
+                                        std::thread::spawn(move || {
+                                            std::thread::sleep(std::time::Duration::from_secs(60));
+                                            if let Ok(mut c) = Clipboard::new() {
+                                                let _ = c.set_text("");
+                                            }
+                                        });
+                                    } else {
+                                        eprintln!("\r\nFailed to copy to clipboard.");
+                                    }
+                                }
+                                Err(e) => eprintln!("\r\nClipboard error: {}", e),
                             }
-                        });
-                    } else {
-                        eprintln!("Failed to copy to clipboard.");
+                            break;
+                        }
+                        KeyCode::Enter => {
+                            let _ = disable_raw_mode();
+                            println!("\r");
+                            break;
+                        }
+                        _ => continue,
                     }
                 }
-                Err(e) => eprintln!("Clipboard unavailable: {}", e),
             }
+            let _ = disable_raw_mode();
         }
         None => {
-            println!("No entry found under this name.\n")
+            println!("No entry found under this name.\n");
         }
     }
 }

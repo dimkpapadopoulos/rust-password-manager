@@ -15,15 +15,16 @@ use std::collections::HashMap;
 fn main() {
     let help =
         "List of available commands (you can use either numbers or keywords, not case-sensitive):
-1. add: Create a new entry in the password vault.
-2. get: Retrieve an entry from the password vault.
-3. delete: Delete an entry from the password vault.
-4. list: Lists all entries in the vault.
-5. gen: Generate a random password of a given length.
-6. edit: Change the attributes of an entry.
-7. import: Import information from a csv file.
-quit: Exit the program.
-help: This menu.";
+        1. add: Create a new entry in the password vault.
+        2. get: Retrieve an entry from the password vault.
+        3. delete: Delete an entry from the password vault.
+        4. list: Lists all entries in the vault.
+        5. gen: Generate a random password of a given length.
+        6. edit: Change the attributes of an entry.
+        7. search: Returns any results that match the search term.
+        8. import: Import information from a csv file.
+        quit: Exit the program.
+        help: This menu.";
     let master_pwd = secrecy::Secret::new(
         rpassword::prompt_password("Enter your master password: ")
             .expect("Failed to get master password."),
@@ -48,9 +49,6 @@ help: This menu.";
             "q" | "quit" => {
                 println!("Now exiting the password manager.");
                 break;
-            }
-            "h" | "help" => {
-                println!("{help}");
             }
             _ => {
                 println!("{help}");

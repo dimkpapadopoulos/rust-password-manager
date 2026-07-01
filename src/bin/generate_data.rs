@@ -3,7 +3,7 @@ use std::io::Write;
 
 fn main() {
     let filename = "large_test.csv";
-    println!("Generating 10,000 entries into '{}'...", filename);
+    println!("Generating 2,000 entries into '{}'...", filename);
 
     let mut file = File::create(filename).expect("Failed to create file");
 
@@ -11,7 +11,7 @@ fn main() {
     writeln!(file, "name,url,username,password").expect("Failed to write header");
 
     // 2. Loop to generate data
-    for i in 0..10000 {
+    for i in 0..2000 {
         // Every 100th line: Create a "Missing Password" error (Only 3 columns)
         if i % 100 == 0 && i != 0 {
             writeln!(

@@ -15,18 +15,7 @@ use std::collections::HashMap;
 use std::io::stdout;
 
 fn main() {
-    let help =
-        "List of available commands (you can use either numbers or keywords, not case-sensitive):
-        1. add: Create a new entry in the password vault.
-        2. get: Retrieve an entry from the password vault.
-        3. delete: Delete an entry from the password vault.
-        4. list: Lists all entries in the vault.
-        5. gen: Generate a random password of a given length.
-        6. edit: Change the attributes of an entry.
-        7. search: Returns any results that match the search term.
-        8. import: Import information from a csv file.
-        quit: Exit the program.
-        help: This menu.";
+    let banner = "[a]dd [g]et [l]ist [e]dit [d]elete [s]earch [n]ew [i]mport [q]uit";
     let master_pwd = secrecy::Secret::new(
         rpassword::prompt_password("Enter your master password: ")
             .expect("Failed to get master password."),
@@ -36,28 +25,35 @@ fn main() {
         load_from_file("passwords.bin", &master_pwd.expose_secret());
 
     loop {
-        let command = input(
-            "This is the CLI password manager. Please type a command to continue \n(for a list of available commands type \"help\" or \"h\"): ",
-        );
-        match command.to_lowercase().as_str() {
-            "add" | "1" => add(&mut vault, &master_pwd.expose_secret()),
-            "get" | "2" => get(&vault),
-            "delete" | "3" => delete(&mut vault, &master_pwd.expose_secret()),
-            "list" | "4" => list(&vault),
-            "gen" | "5" => _ = generate(),
-            "edit" | "6" => edit(&mut vault, &master_pwd.expose_secret()),
-            "search" | "7" => search(&vault),
-            "import" | "8" => import(&mut vault, &master_pwd),
-            "q" | "quit" => {
+        println!("\n{}", banner);
+
+        let raw = input("> ");
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let cmd = parts[0].to_lowercase();
+        let args: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
+
+        match cmd.as_str() {
+            "add" | "a" => add(&mut vault, &master_pwd.expose_secret(), &args),
+            "get" | "g" => get(&vault, &args),
+            "delete" | "d" => delete(&mut vault, &master_pwd.expose_secret(), &args),
+            "list" | "l" => list(&vault, &args),
+            "gen" | "n" => {
+                generate(&args);
+            }
+            "edit" | "e" => edit(&mut vault, &master_pwd.expose_secret(), &args),
+            "search" | "s" => search(&vault, &args),
+            "import" | "i" => import(&mut vault, &master_pwd, &args),
+            "quit" | "q" => {
                 println!("Now exiting the password manager.");
                 break;
             }
-            _ => {
-                println!("{help}");
-            }
+            "help" | "h" => println!("{}", banner),
+            _ => println!("{}", banner),
         }
-
-        input("Press enter to go back to menu.");
-        execute!(stdout(), Clear(ClearType::All)).expect("failed to clear screen");
     }
 }

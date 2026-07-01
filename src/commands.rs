@@ -16,19 +16,36 @@ use std::io::{BufRead, BufReader, Write, stdout};
 
 const DB_FILE: &str = "passwords.bin";
 
-pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
-    let name = input("Name: ");
-    let url = input("Url: ");
-    let username = input("Username: ");
-    let password_input = prompt_password("Password (leave empty for random password): ");
-    if password_input.is_err() {
-        return;
-    }
-
-    let mut password = password_input.unwrap();
-    if password.is_empty() {
-        password = generate();
-    }
+pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str, args: &[String]) {
+    let name = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Name: ")
+    };
+    let url = if args.len() > 1 {
+        args[1].clone()
+    } else {
+        input("Url: ")
+    };
+    let username = if args.len() > 2 {
+        args[2].clone()
+    } else {
+        input("Username: ")
+    };
+    let password = if args.len() > 3 {
+        args[3].clone()
+    } else {
+        let password_input = prompt_password("Password (leave empty for random password): ");
+        if password_input.is_err() {
+            return;
+        }
+        let pwd = password_input.unwrap();
+        if pwd.is_empty() {
+            generate(&[])
+        } else {
+            pwd
+        }
+    };
     println!("Adding entry to vault.");
     let new_entry = Entry {
         name,
@@ -48,8 +65,12 @@ pub fn add(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
     }
 }
 
-pub fn get(vault: &HashMap<String, Entry>) {
-    let name = input("Name: ");
+pub fn get(vault: &HashMap<String, Entry>, args: &[String]) {
+    let name = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Name: ")
+    };
 
     match vault.get(&name) {
         Some(entry) => {
@@ -136,17 +157,22 @@ pub fn get(vault: &HashMap<String, Entry>) {
     }
 }
 
-pub fn list(vault: &HashMap<String, Entry>) {
-    println!("Stored passwords: {}", vault.len());
+pub fn list(vault: &HashMap<String, Entry>, _args: &[String]) {
+    let count = vault.len();
+    println!("Stored passwords: {}", count);
     let mut i = 0;
-    for (name, _entry) in vault {
+    for (_name, entry) in vault {
         i += 1;
-        println!("{}. {}", i, name);
+        println!("{}. {} — {} ({})", i, entry.name, entry.username, entry.url);
     }
 }
 
-pub fn generate() -> String {
-    let len_str = input("Length (default 16):");
+pub fn generate(args: &[String]) -> String {
+    let len_str = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Length (default 16):")
+    };
     let len = len_str.parse::<usize>().unwrap_or(16); // Default to 16 if input is invalid
 
     let password = generate_password(len);
@@ -163,8 +189,12 @@ pub fn generate() -> String {
     password
 }
 
-pub fn edit(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
-    let name = input("Entry to edit: ");
+pub fn edit(vault: &mut HashMap<String, Entry>, master_pwd: &str, args: &[String]) {
+    let name = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Entry to edit: ")
+    };
 
     if let Some(entry) = vault.get_mut(&name) {
         // .get_mut allows modification
@@ -195,20 +225,37 @@ pub fn edit(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
     }
 }
 
-pub fn delete(vault: &mut HashMap<String, Entry>, master_pwd: &str) {
-    let name = input("Name: ");
-    let outcome = vault.remove(&name.clone());
-    match outcome {
-        Some(_) => {
-            save_to_file(vault, "passwords.bin", &master_pwd);
-            println!("Entry deleted succesfully.");
+pub fn delete(vault: &mut HashMap<String, Entry>, master_pwd: &str, args: &[String]) {
+    let name = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Name: ")
+    };
+
+    match vault.get(&name) {
+        Some(entry) => {
+            let confirm = input(&format!(
+                "Are you sure you want to delete {}? (y/n): ",
+                entry.name
+            ));
+            if confirm.to_lowercase() == "y" || confirm.to_lowercase() == "yes" {
+                vault.remove(&name);
+                save_to_file(vault, "passwords.bin", master_pwd);
+                println!("Entry deleted successfully.");
+            } else {
+                println!("Deletion cancelled.");
+            }
         }
         None => println!("Entry not found in vault."),
     }
 }
 
-pub fn search(vault: &HashMap<String, Entry>) {
-    let query = input("Search query: ");
+pub fn search(vault: &HashMap<String, Entry>, args: &[String]) {
+    let query = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Search query: ")
+    };
     println!("--- Matches ---");
     for key in vault.keys() {
         if key.to_lowercase().contains(&query.to_lowercase()) {
@@ -238,8 +285,12 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     fields
 }
 
-pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>) {
-    let path = input("Path of csv file: ");
+pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>, args: &[String]) {
+    let path = if args.len() > 0 {
+        args[0].clone()
+    } else {
+        input("Path of csv file: ")
+    };
     let file = match File::open(&path) {
         Ok(f) => f,
         Err(e) => {

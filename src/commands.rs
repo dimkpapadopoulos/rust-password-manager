@@ -12,7 +12,7 @@ use rpassword::prompt_password;
 use secrecy::{ExposeSecret, Secret};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Write, stdout};
+use std::io::{BufRead, BufReader, Write, stdout};
 
 const DB_FILE: &str = "passwords.bin";
 
@@ -218,6 +218,26 @@ pub fn search(vault: &HashMap<String, Entry>) {
     println!("---------------");
 }
 
+/// Parse a single CSV line, handling quoted fields (fields may contain commas inside quotes).
+fn parse_csv_line(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for ch in line.chars() {
+        match ch {
+            '"' => in_quotes = !in_quotes,
+            ',' if !in_quotes => {
+                fields.push(current.trim().to_string());
+                current = String::new();
+            }
+            _ => current.push(ch),
+        }
+    }
+    fields.push(current.trim().to_string());
+    fields
+}
+
 pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>) {
     let path = input("Path of csv file: ");
     let file = match File::open(&path) {
@@ -227,39 +247,47 @@ pub fn import(vault: &mut HashMap<String, Entry>, master_pwd: &Secret<String>) {
             return;
         }
     };
-    let mut rdr = csv::Reader::from_reader(file);
+    let reader = BufReader::new(file);
+    let mut lines = reader.lines();
     let mut count = 0;
     let mut skipped = 0;
-    for result in rdr.records() {
+
+    // Skip the header line (matches csv::Reader's default has_headers=true behavior)
+    let _header = lines.next();
+
+    for result in lines {
         match result {
-            Ok(record) => {
+            Ok(line) => {
+                let line = line.trim().to_string();
+                if line.is_empty() {
+                    continue;
+                }
+                let record = parse_csv_line(&line);
                 if record.len() >= 4 {
-                    let name = record[0].to_string();
-                    let url = record[1].to_string();
-                    let username = record[2].to_string();
-                    let password = record[3].to_string();
+                    let name = record[0].clone();
+                    let url = record[1].clone();
+                    let username = record[2].clone();
+                    let password = record[3].clone();
 
-                    // Create the Entry struct
-                    let new_entry = Entry {
-                        name: name.clone(),
-                        url: url,
-                        username,
-                        password: Secret::new(password),
-                    };
-
-                    // Insert into Vault
-                    vault.insert(name, new_entry);
+                    vault.insert(
+                        name.clone(),
+                        Entry {
+                            name,
+                            url,
+                            username,
+                            password: Secret::new(password),
+                        },
+                    );
                     count += 1;
                 } else {
                     println!("Skipping row (not enough columns): {:?}", record);
                     skipped += 1;
                 }
             }
-            Err(_) => skipped += 1, // Skip corrupt rows
+            Err(_) => skipped += 1,
         }
     }
 
-    // 4. Save the updated vault to disk immediately
     save_to_file(vault, DB_FILE, master_pwd.expose_secret());
 
     println!("--------------------------------------------------");

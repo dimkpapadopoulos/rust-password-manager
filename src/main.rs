@@ -8,9 +8,11 @@ use crate::commands::*;
 use crate::models::Entry;
 use crate::storage::load_from_file;
 use crate::utils::input;
-use clearscreen;
+use crossterm::execute;
+use crossterm::terminal::{Clear, ClearType};
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
+use std::io::stdout;
 
 fn main() {
     let help =
@@ -29,7 +31,7 @@ fn main() {
         rpassword::prompt_password("Enter your master password: ")
             .expect("Failed to get master password."),
     );
-    clearscreen::clear().expect("failed to clear screen.");
+    execute!(stdout(), Clear(ClearType::All)).expect("failed to clear screen.");
     let mut vault: HashMap<String, Entry> =
         load_from_file("passwords.bin", &master_pwd.expose_secret());
 
@@ -56,6 +58,6 @@ fn main() {
         }
 
         input("Press enter to go back to menu.");
-        clearscreen::clear().expect("failed to clear screen");
+        execute!(stdout(), Clear(ClearType::All)).expect("failed to clear screen");
     }
 }
